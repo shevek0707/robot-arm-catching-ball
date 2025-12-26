@@ -22,7 +22,7 @@ def check_self_collision(lengths, theta):
     y = np.cumsum(np.insert(lengths * np.sin(theta), 0, 0))
 
     for i in range(n):
-        for j in range(i + 1, n):
+        for j in range(i + 2, n):
             p1 = (x[i], y[i])
             p2 = (x[i+1], y[i+1])
             p3 = (x[j], y[j])
@@ -32,26 +32,32 @@ def check_self_collision(lengths, theta):
                 return True 
     return False
 
-def fitness(lengths, xg, yg, theta,last_theta=None,lambda_=0.001):
+def fitness(lengths, xg, yg, theta,last_theta=None,lambda_change=0.0001,lambda_collision=1e10):
     #1, the basic cost of distance
     x = np.sum(lengths * np.cos(theta), axis=1)
     y = np.sum(lengths * np.sin(theta), axis=1)
-    res = distance(x, y, xg, yg)**2
+    dist_cost = distance(x, y, xg, yg)**2
     
     #2，the penalty for the change between two states
+    change_cost = 0
     if last_theta is not None:
         delta = (theta - last_theta + np.pi) % (2*np.pi) - np.pi
-        res += lambda_*np.sum(np.abs(delta))
+        change_cost = lambda_change*np.sum(np.abs(delta))
+        #the effect of abs seems better than square 
 
     #3，the penalty for the intersection of the arms
+    collision_cost=0
     if check_self_collision(lengths,theta):
-        res += 1e10
-    
-    
+        base_penalty=lambda_collision
+        #distance_factor= np.exp(-dist_cost/(sum(lengths)**2)) the current results are not good enough to use this factor
+        #collision_cost=base_penalty*distance_factor
+        collision_cost=base_penalty
+
+    res = dist_cost + change_cost + collision_cost
     return res
 
 
-def pso(lengths, xg, yg, num_particles=100, num_iterations=20, w=0.7, c1=1.5, c2=1.5, last_pos=None):
+def pso(lengths, xg, yg, num_particles=100, num_iterations=30, w=0.7, c1=1.5, c2=1.5, last_pos=None):
 
     num_dimensions = len(lengths)
     bounds = np.array([[0, 2*np.pi]] * len(lengths))
